@@ -1,0 +1,22 @@
+#cloud-config
+password: passw0rd
+chpasswd: { expire: False }
+ssh_pwauth: True
+ssh_authorized_keys:
+ - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDJOQ5si/KTxqG5XrT1gfXhaGqzV+kSG43iEr3pWsKpQBef5rsBVsukfTazD1oeZwm1XdHRqItGjJ7TAsanoUu4FHKB2gM+lzTuaNVzoXQ0tlOz2J+1cDmalafeRb3N9ReE7NhboqxIoKxV4AGMJMcwJht8ZlbgJKyzTaiYxN6HT8cQ76O09Unsq2b6N6EWL9VYbgmXCv2VQfgujxqyXLX1eEXz+jVm7EeeNhFyFmCw/LEAn9J5d+m4N12gL5ZQMXWTyikTVKnML3bpzk+FsdZ5CvuZ9ubv7i0+UD2dkgnDCERzC++hBR9vFwUPl4WcvJ11DRZAOyBJzkdOba4tLv3D caribou@marvin
+# Update apt database on first boot
+# (ie run apt-get update)
+#
+# Default: true
+# Aliases: apt_update
+#runcmd:
+# - echo "Acquire::http::Proxy http://192.168.122.1:9999/;" > /etc/apt/apt.conf
+
+package_update: true
+
+packages:
+ - linux-crashdump
+
+power_state:
+ mode: reboot
+ message: Rebooting to get ready for crashdump test

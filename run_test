@@ -1,0 +1,93 @@
+#!/bin/bash
+
+wait-for-boot()
+{
+while true;do
+   sleep 30
+   nova console-log kdump_test_${Release}_${Size[$I]} | grep -qi "cloud-init .* finished"
+   if ! (( $? ));
+      then break
+      fi
+   echo "Instance kdump_test_${Release}_${Size[$I]} not finished booting, sleeping..."
+   done
+}
+
+wait-for-deleted()
+{
+while true;do
+   sleep 30
+   nova list | grep -q kdump_test_${Release}_${Size[$I]}
+   if (( $? ));
+      then break
+      fi
+   echo "Instance kdump_test_${Release}_${Size[$I]} still running, sleeping..."
+   done
+}
+
+get-instance-ip()
+{
+   while [ -z $Ip ];do
+      Ip=$(nova list | grep kdump_test_${Release}_ | awk '{print $12}')
+      Ip=${Ip#canonistack=}
+      if [ "$Ip" == "|" ]; then
+         Ip=""
+      fi
+      sleep 5
+   done
+   echo $Ip
+}
+
+# Flavor
+# 2 : 2G
+# 3 : 4G
+# 4 : 8G
+# 1299 : 10G
+# 1300 : 18G
+
+Size[2]=2G
+Size[3]=4G
+Size[4]=8G
+Size[1299]=10G
+
+#Precise image
+Image=3911e654-9c02-4d33-8d57-2bc93788a7ef
+#Saucy image
+#Image=a10c1e20-5c19-4726-ac88-bff0c988fcb0
+Key=lbouchard_lcy01
+Release=Precise
+#Release=Saucy
+
+for I in 2 3 4 1299;do
+   echo "Starting Canonistack instance named kdump_test_${Release}_${Size[$I]}"
+   nova boot --image $Image --key-name $Key --user-data crashdump_test.txt --flavor $I kdump_test_${Release}_${Size[$I]}
+
+   InstanceIp=$(get-instance-ip)
+   
+   echo "Instance Ip address is : $InstanceIp"
+
+   wait-for-boot
+   
+   echo "Rebooting instance kdump_test_${Release}_${Size[$I]}"
+   nova reboot kdump_test_${Release}_${Size[$I]}
+
+   wait-for-boot kdump_test_${Release}_${Size[$I]}
+
+   echo "Crashing kdump_test_${Release}_${Size[$I]} instance"
+
+   nohup ssh -oStrictHostKeyChecking=no ubuntu@$InstanceIp "sudo /home/ubuntu/crashit" > /dev/null 2>&1 &
+   sleep 5
+   kill %1
+
+   wait-for-boot
+
+   echo "Getting results of the crash test"
+   ssh -oStrictHostKeyChecking=no ubuntu@${InstanceIp} sudo cp /root/kdump_test kdump_test
+   scp -oStrictHostKeyChecking=no ubuntu@${InstanceIp}:kdump_test kdump_test_${Release}_${Size[$I]}
+   cat kdump_test_${Release}_${Size[$I]}
+
+   echo "Terminating the instance kdump_test_${Release}_${Size[$I]}"
+   nova delete kdump_test_${Release}_${Size[$I]}
+   wait-for-deleted
+done
+
+echo "Test completed"
